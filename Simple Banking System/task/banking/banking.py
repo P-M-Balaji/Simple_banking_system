@@ -13,16 +13,19 @@ class CardDB:
         self.card_number = ""
 
     def get_card(self, card_num_):
-        self.card_number = cur.execute("SELECT pin FROM card WHERE number = {};".format(card_num_))
+        cur.execute("SELECT number FROM card WHERE number = {};".format(card_num_))
+        self.card_number = cur.fetchone()
         return self.card_number
 
     def get_pin(self, card_num_):
-        self.pin_num_ = cur.execute("SELECT pin FROM card WHERE number = {};".format(card_num_))
+        cur.execute("SELECT pin FROM card WHERE number = {};".format(card_num_))
+        self.pin_num_ = cur.fetchone()
         return self.pin_num_
 
     def get_balance_(self, card_num_):
-        self.balance_ = cur.execute("SELECT balance FROM card WHERE number = {};".format(card_num_))
-        return self.balance_
+        cur.execute("SELECT balance FROM card WHERE number = {};".format(card_num_))
+        self.balance_ = cur.fetchone()
+        return str(self.balance_)[1]
 
 
 class Card:
@@ -36,6 +39,7 @@ class Card:
         self.balance_ = 0
         self.pin = random.randint(1000, 9999)
         self.get_balance_ = 0
+        self.card_db = CardDB()
 
     def checksum(self, codeword_):
         self.codeword_ = codeword_
@@ -70,7 +74,7 @@ class Card:
         return self.balance_
 
     def login(self, card_num_, pin_num_):
-        if card_num_ == CardDB.get_card(card_num_) and pin_num_ == CardDB.get_pin(card_num_):
+        if card_num_ in str(self.card_db.get_card(card_num_)) and str(pin_num_) in str(self.card_db.get_pin(card_num_)):
             print("You have successfully logged in!")
             while True:
                 self.choice2 = int(input("1. Balance\n2. Log out\n0. Exit\n"))
@@ -87,19 +91,19 @@ class Card:
             print("Wrong card number or PIN!")
 
     def get_balance(self, card_num__):
-        self.get_balance_ = CardDB.get_balance_(card_num__)
+        self.get_balance_ = str(self.card_db.get_balance_(card_num__))
         return self.get_balance_
 
 
+count = 1
 while 1:
     print("1. Create an account")
     print("2. Log into account")
     print("0. Exit")
-    count = 1
     choice1 = int(input())
     if choice1 == 1:
         card_ = Card()
-        cur.execute('INSERT INTO card (id, number, pin, balance) VALUES ({},NULL,NULL,NULL)'.format(count))
+        cur.execute('INSERT INTO card (id, number, pin, balance) VALUES ({},NULL,NULL,0)'.format(count))
         conn.commit()
         card_number = card_.create_code(count)
         print("Your card has been created\nYour card number:")
