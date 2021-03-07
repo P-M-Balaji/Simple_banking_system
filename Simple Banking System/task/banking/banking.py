@@ -25,7 +25,7 @@ class CardDB:
     def get_balance_(self, card_num_):
         cur.execute("SELECT balance FROM card WHERE number = {};".format(card_num_))
         self.balance_ = cur.fetchone()
-        return str(self.balance_)[1]
+        return str(self.balance_)[1:-2]
 
 
 class Card:
@@ -34,10 +34,10 @@ class Card:
         self.codeword_ = ""
         self.codeword_list = []
         self.sum = 0
-        self.code_ = "400000" + str(random.randint(100000000, 999999999))
+        self.code_ = "400000" + str(f"{random.randint(0, 999999999):09d}")
         self.checksum_ = self.checksum(self.code_)
         self.balance_ = 0
-        self.pin = random.randint(1000, 9999)
+        self.pin = f"{random.randint(0, 9999):04d}"
         self.get_balance_ = 0
         self.card_db = CardDB()
 
@@ -55,21 +55,21 @@ class Card:
         return 10 - (self.sum % 10) if self.sum % 10 != 0 else 0
 
     def create_code(self, count_):
-        self.code_ = "400000" + str(random.randint(100000000, 999999999))
+        self.code_ = "400000" + str(f"{random.randint(0, 999999999):09d}")
         self.checksum_ = self.checksum(self.code_)
-        cur.execute('UPDATE card SET number = {} WHERE id = {}'.format(self.code_ + str(self.checksum_), count_))
+        cur.execute(f'UPDATE card SET number = {self.code_ + str(self.checksum_)} WHERE id = {count_};')
         conn.commit()
         return self.code_ + str(self.checksum_)
 
     def create_pin(self, count_):
-        self.pin = random.randint(1000, 9999)
-        cur.execute('UPDATE card SET pin = {} WHERE id = {}'.format(self.pin, count_))
+        self.pin = f"{random.randint(0, 9999):04d}"
+        cur.execute(f'UPDATE card SET pin = {self.pin} WHERE id = {count_};')
         conn.commit()
         return self.pin
 
     def create_balance(self, count_):
         self.balance_ = 0
-        cur.execute('UPDATE card SET balance = {} WHERE id = {}'.format(self.balance_, count_))
+        cur.execute(f'UPDATE card SET balance = {self.balance_} WHERE id = {count_};')
         conn.commit()
         return self.balance_
 
@@ -77,22 +77,60 @@ class Card:
         if card_num_ in str(self.card_db.get_card(card_num_)) and str(pin_num_) in str(self.card_db.get_pin(card_num_)):
             print("You have successfully logged in!")
             while True:
-                self.choice2 = int(input("1. Balance\n2. Log out\n0. Exit\n"))
+                print("1. Balance\n2. Add income\n3. Do transfer\n4. Close account\n5. Log out\n0. Exit\n")
+                self.choice2 = int(input())
                 if self.choice2 == 1:
                     print("\nBalance:", self.get_balance(card_num_))
                     continue
                 if self.choice2 == 2:
+                    credit = int(input("Enter income:"))
+                    self.balance_ = int(self.get_balance(card_num_))
+                    self.balance_ = self.balance_ + credit
+                    cur.execute(f'UPDATE card SET balance = {self.balance_} WHERE number = {card_num_};')
+                    conn.commit()
+                    print("Income was added!")
+                    continue
+                if self.choice2 == 3:
+                    print("\nTransfer")
+                    card_no = input("Enter card number:")
+                    if card_no in str(self.card_db.get_card(card_no)):
+                        transfer = int(input("Enter how much money you want to transfer:"))
+                        if transfer < self.balance_:
+                            balance_ = self.get_balance(card_num_) - transfer
+                            cur.execute(f'UPDATE card SET balance = {balance_} WHERE number = {card_num_};')
+                            conn.commit()
+                            balance_ = self.get_balance(card_no) + transfer
+                            cur.execute(f'UPDATE card SET balance = {balance_} WHERE number = {card_no};')
+                            conn.commit()
+                            print("Success!")
+                            continue
+                        else:
+                            print("Not enough money!")
+                            continue
+                    elif self.checksum(card_no[0:-1]) != card_no[-1] and card_no[:6] == "400000":
+                        print("Probably you made a mistake in the card number. Please try again!")
+                        continue
+                    else:
+                        print("Such a card does not exist.")
+                        continue
+                if self.choice2 == 4:
+                    conn.execute(f'DELETE FROM card WHERE number = {card_num_};')
+                    conn.commit()
+                    print("\nThe account has been closed!")
+                    break
+                if self.choice2 == 5:
                     print("You have successfully logged out!")
                     break
                 else:
                     print("Bye!")
+                    cur.close()
                     exit(0)
         else:
             print("Wrong card number or PIN!")
 
     def get_balance(self, card_num__):
-        self.get_balance_ = str(self.card_db.get_balance_(card_num__))
-        return self.get_balance_
+        self.get_balance_ = self.card_db.get_balance_(card_num__)
+        return int(self.get_balance_)
 
 
 count = 1
@@ -103,7 +141,7 @@ while 1:
     choice1 = int(input())
     if choice1 == 1:
         card_ = Card()
-        cur.execute('INSERT INTO card (id, number, pin, balance) VALUES ({},NULL,NULL,0)'.format(count))
+        cur.execute('INSERT INTO card (id, number, pin, balance) VALUES ({},NULL,NULL,0);'.format(count))
         conn.commit()
         card_number = card_.create_code(count)
         print("Your card has been created\nYour card number:")
@@ -121,4 +159,5 @@ while 1:
         card_.login(card_num, pin_num)
     else:
         print("Bye!")
+        cur.close()
         exit(0)
